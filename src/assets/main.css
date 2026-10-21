@@ -1,0 +1,111 @@
+/* 全域設計 token 與共用元件樣式；各元件自己的樣式寫在 .vue 的 <style scoped> */
+:root {
+  --bg: #eef1ef;
+  --surface: #ffffff;
+  --surface-2: #f3f6f4;
+  --ink: #14201b;
+  --muted: #5b6a64;
+  --line: #d6ddd9;
+  --focus: #0070bd;
+  --on-ink: #ffffff;
+  --f-body: 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', system-ui, sans-serif;
+  --f-num: 'Barlow Condensed', 'Arial Narrow', 'Roboto Condensed', sans-serif;
+  --r: 16px;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e1311;
+    --surface: #161e1b;
+    --surface-2: #1d2723;
+    --ink: #e7eeea;
+    --muted: #93a39c;
+    --line: #2b3732;
+    --focus: #5aa9e6;
+    --on-ink: #0e1311;
+    color-scheme: dark;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--f-body);
+  font-size: 16px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+#app {
+  min-height: 100%;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* 共用：畫面容器與按鈕 */
+.screen {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1;
+}
+
+.primary {
+  border: 0;
+  border-radius: 14px;
+  background: var(--ink);
+  color: var(--on-ink);
+  font-size: 1.0625rem;
+  font-weight: 700;
+  min-height: 56px;
+  padding: 0 20px;
+  letter-spacing: 0.04em;
+}
+.primary:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.secondary {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  min-height: 56px;
+  font-weight: 700;
+}
+.secondary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.ghost {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 700;
+  padding: 8px 0;
+  min-height: 44px;
+}
