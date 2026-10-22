@@ -14,19 +14,19 @@ defineProps({
 
     <template v-else>
       <div class="sum">
-        <span><b>{{ route.stations }}</b>站</span>
-        <span><b>{{ route.transfers }}</b>次轉乘</span>
+        <span><b>{{ route.stopCount }}</b>站</span>
+        <span><b>{{ route.transferCount }}</b>次轉乘</span>
       </div>
       <ol class="legs">
         <li
           v-for="leg in route.legs"
-          :key="leg.svc + leg.from"
-          :style="{ '--lc': leg.color, '--lci': leg.ink }"
+          :key="leg.serviceId + leg.from"
+          :style="{ '--lc': leg.color, '--lci': leg.textColor }"
         >
           <span class="pill">{{ leg.lineName }}</span>
           <span class="leg-text">
             {{ leg.from }} → {{ leg.to }}
-            <small>往 {{ leg.dir }} 方向 · 坐 {{ leg.count }} 站</small>
+            <small>往 {{ leg.direction }} 方向 · 坐 {{ leg.stopCount }} 站</small>
           </span>
         </li>
       </ol>

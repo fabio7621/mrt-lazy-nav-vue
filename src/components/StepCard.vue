@@ -1,74 +1,76 @@
 <script setup>
 // 導航頁的大卡片：一次只顯示一個動作
-// 父層用 :key="step" 綁定，換步驟時元件會重新建立 → 進場動畫重播、expanded 自動重置
+// 父層用 :key="stepIndex" 綁定，換步驟時元件會重新建立 → 進場動畫重播、isStopListExpanded 自動重置
 import { ref, computed } from 'vue'
 import LineCode from './LineCode.vue'
-import { codeOn } from '../utils/station'
+import { getStationCode } from '../utils/station'
 
 const props = defineProps({
   action: { type: Object, required: true }, // { type, leg }
-  index: { type: Number, required: true },
+  stepIndex: { type: Number, required: true },
   route: { type: Object, required: true },
 })
 
-const expanded = ref(false)
+// 沿途站太多時只留頭尾幾站，中間折起來
+const MAX_VISIBLE_STOPS = 7
+const HEAD_STOP_COUNT = 2
+const TAIL_STOP_COUNT = 3
+
+const isStopListExpanded = ref(false)
 const leg = computed(() => props.action.leg)
-const kind = computed(() => props.action.type)
-const isBoarding = computed(() => kind.value === 'board' || kind.value === 'transfer')
+const actionType = computed(() => props.action.type)
+const stepNumber = computed(() => props.stepIndex + 1)
+const isBoarding = computed(() => actionType.value === 'board' || actionType.value === 'transfer')
 
 const cardClass = computed(() =>
-  kind.value === 'ride' ? 'ride' : kind.value === 'arrive' ? 'arrive' : 'fill',
+  actionType.value === 'ride' ? 'ride' : actionType.value === 'arrive' ? 'arrive' : 'fill',
 )
 const cardStyle = computed(() =>
-  kind.value === 'arrive' ? {} : { '--lc': leg.value.color, '--lci': leg.value.ink },
+  actionType.value === 'arrive' ? {} : { '--lc': leg.value.color, '--lci': leg.value.textColor },
 )
 
 // ---------- 上車 / 轉乘：版面相同，只差文字 ----------
-const isFirstBoarding = computed(() => kind.value === 'board')
-const boardingLabel = computed(() => (isFirstBoarding.value ? '進站' : '轉乘'))
-const boardingVerb = computed(() => (isFirstBoarding.value ? '搭' : '轉'))
+const isInitialBoarding = computed(() => actionType.value === 'board')
+const boardingLabel = computed(() => (isInitialBoarding.value ? '進站' : '轉乘'))
+const boardingVerb = computed(() => (isInitialBoarding.value ? '搭' : '轉'))
 const boardingTip = computed(() => {
-  const { hue, lineName, dir } = leg.value
-  return isFirstBoarding.value
-    ? `進站後找${hue}色的「${lineName}」指標，月台上寫著「往 ${dir}」的那一側。`
-    : `下車後跟著${hue}色的轉乘指標走，到「往 ${dir}」的月台候車。`
+  const { colorName, lineName, direction } = leg.value
+  return isInitialBoarding.value
+    ? `進站後找${colorName}色的「${lineName}」指標，月台上寫著「往 ${direction}」的那一側。`
+    : `下車後跟著${colorName}色的轉乘指標走，到「往 ${direction}」的月台候車。`
 })
 
 // ---------- 乘車中 ----------
 const rideTip = computed(() =>
-  leg.value.count === 1
+  leg.value.stopCount === 1
     ? '下一站就要下車，可以先往車門移動。'
     : `聽到「${leg.value.stops.at(-2)}」到站後，下一站就要下車。`,
 )
 
-// 沿途站：超過 7 站時只留頭兩站和最後三站，中間折起來
-const MAX_VISIBLE_STOPS = 7
-const HEAD_STOPS = 2
-const TAIL_STOPS = 3
-
-function stopRow(name, i, n) {
-  const isFirst = i === 0
-  const isLast = i === n - 1
+function createStopRow(name, index, lastIndex) {
+  const isFirst = index === 0
+  const isLast = index === lastIndex
   return {
     type: 'stop',
     name,
-    cls: isFirst ? 'first' : isLast ? 'last' : '',
-    tag: isFirst ? '上車' : isLast ? '下車' : i === 1 ? '下一站' : '',
+    className: isFirst ? 'first' : isLast ? 'last' : '',
+    tag: isFirst ? '上車' : isLast ? '下車' : index === 1 ? '下一站' : '',
   }
 }
 
-function collapsedRows(stops) {
-  const n = stops.length
-  const row = (i) => stopRow(stops[i], i, n)
-  const head = Array.from({ length: HEAD_STOPS }, (_, i) => row(i))
-  const tail = Array.from({ length: TAIL_STOPS }, (_, i) => row(n - TAIL_STOPS + i))
-  return [...head, { type: 'gap', hidden: n - HEAD_STOPS - TAIL_STOPS }, ...tail]
+function buildCollapsedRows(stops) {
+  const lastIndex = stops.length - 1
+  const rowAt = (index) => createStopRow(stops[index], index, lastIndex)
+  const headRows = Array.from({ length: HEAD_STOP_COUNT }, (_, i) => rowAt(i))
+  const tailRows = Array.from({ length: TAIL_STOP_COUNT }, (_, i) => rowAt(stops.length - TAIL_STOP_COUNT + i))
+  const gapRow = { type: 'gap', hiddenCount: stops.length - HEAD_STOP_COUNT - TAIL_STOP_COUNT }
+  return [...headRows, gapRow, ...tailRows]
 }
 
 const stopRows = computed(() => {
   const stops = leg.value.stops
-  if (stops.length > MAX_VISIBLE_STOPS && !expanded.value) return collapsedRows(stops)
-  return stops.map((name, i) => stopRow(name, i, stops.length))
+  if (stops.length > MAX_VISIBLE_STOPS && !isStopListExpanded.value) return buildCollapsedRows(stops)
+  return stops.map((name, i) => createStopRow(name, i, stops.length - 1))
 })
 </script>
 
@@ -76,41 +78,43 @@ const stopRows = computed(() => {
   <article class="step" :class="cardClass" :style="cardStyle" aria-live="polite">
     <!-- 上車 / 轉乘 -->
     <template v-if="isBoarding">
-      <p class="eyebrow">第 {{ index + 1 }} 步 · {{ boardingLabel }}</p>
+      <p class="eyebrow">第 {{ stepNumber }} 步 · {{ boardingLabel }}</p>
       <p class="where">
         在 <strong>{{ leg.from }}</strong>
-        <LineCode :code="codeOn(leg.from, leg.line)" :line="leg.line" />
-        <span v-if="kind === 'transfer'">不用出站</span>
+        <LineCode :code="getStationCode(leg.from, leg.line)" :line="leg.line" />
+        <span v-if="actionType === 'transfer'">不用出站</span>
       </p>
       <h2 class="big">{{ boardingVerb }} {{ leg.lineName }}</h2>
       <div class="dir">
         <span class="dir-label">往</span>
-        <span class="dir-name">{{ leg.dir }}</span>
+        <span class="dir-name">{{ leg.direction }}</span>
         <span class="dir-label">方向</span>
       </div>
       <p class="tip">{{ boardingTip }}</p>
     </template>
 
     <!-- 乘車中 -->
-    <template v-else-if="kind === 'ride'">
-      <p class="eyebrow">第 {{ index + 1 }} 步 · 乘車 · {{ leg.lineName }}</p>
+    <template v-else-if="actionType === 'ride'">
+      <p class="eyebrow">第 {{ stepNumber }} 步 · 乘車 · {{ leg.lineName }}</p>
       <div class="count">
-        <span class="num">{{ leg.count }}</span>
+        <span class="num">{{ leg.stopCount }}</span>
         <span class="unit">站</span>
       </div>
       <p class="where">
         在 <strong>{{ leg.to }}</strong>
-        <LineCode :code="codeOn(leg.to, leg.line)" :line="leg.line" />
+        <LineCode :code="getStationCode(leg.to, leg.line)" :line="leg.line" />
         下車
       </p>
       <ol class="stops">
-        <template v-for="(r, i) in stopRows" :key="i">
-          <li v-if="r.type === 'gap'" class="gap">
-            <button type="button" @click="expanded = true">中間還有 {{ r.hidden }} 站 · 展開</button>
+        <template v-for="(row, i) in stopRows" :key="i">
+          <li v-if="row.type === 'gap'" class="gap">
+            <button type="button" @click="isStopListExpanded = true">
+              中間還有 {{ row.hiddenCount }} 站 · 展開
+            </button>
           </li>
-          <li v-else :class="r.cls">
-            <span class="s">{{ r.name }}</span>
-            <span v-if="r.tag" class="tag">{{ r.tag }}</span>
+          <li v-else :class="row.className">
+            <span class="s">{{ row.name }}</span>
+            <span v-if="row.tag" class="tag">{{ row.tag }}</span>
           </li>
         </template>
       </ol>
@@ -121,7 +125,7 @@ const stopRows = computed(() => {
     <template v-else>
       <p class="eyebrow">完成</p>
       <h2 class="big">抵達 {{ leg.to }}</h2>
-      <p class="tip">這趟共坐 {{ route.stations }} 站、轉乘 {{ route.transfers }} 次。出站時記得刷卡。</p>
+      <p class="tip">這趟共坐 {{ route.stopCount }} 站、轉乘 {{ route.transferCount }} 次。出站時記得刷卡。</p>
     </template>
   </article>
 </template>

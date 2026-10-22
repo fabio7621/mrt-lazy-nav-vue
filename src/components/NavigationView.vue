@@ -1,69 +1,74 @@
 <script setup>
 // 導航頁：進度條 + 一張步驟卡片 + 上一步／下一步
-// 核心觀念：畫面 = 依 actions[step] 畫出來，按鈕只負責改 step
+// 核心觀念：畫面 = 依 actions[stepIndex] 畫出來，按鈕只負責改 stepIndex
 import { computed, onMounted, onUnmounted } from 'vue'
 import StepCard from './StepCard.vue'
-import { toActions, routeEnds } from '../utils/route'
+import { buildActions, getRouteEnds } from '../utils/route'
 
 const props = defineProps({
   route: { type: Object, required: true },
 })
-const step = defineModel('step', { type: Number, default: 0 })
+const stepIndex = defineModel('stepIndex', { type: Number, default: 0 })
 const emit = defineEmits(['exit'])
 
-const actions = computed(() => toActions(props.route.legs))
-const current = computed(() => actions.value[step.value])
-const nextAction = computed(() => actions.value[step.value + 1])
-const isLast = computed(() => step.value >= actions.value.length - 1)
-const routeLabel = computed(() => {
-  const { from, to } = routeEnds(props.route)
-  return `${from} → ${to}`
-})
-
-const BUTTON_TEXT = {
+const PRIMARY_BUTTON_TEXT = {
   board: '我上車了',
   transfer: '我上車了',
   ride: '我下車了',
   arrive: '再查一條路線',
 }
 
-function brief(a) {
-  const l = a.leg
+const actions = computed(() => buildActions(props.route.legs))
+const currentAction = computed(() => actions.value[stepIndex.value])
+const nextAction = computed(() => actions.value[stepIndex.value + 1])
+const isLastStep = computed(() => stepIndex.value >= actions.value.length - 1)
+const routeLabel = computed(() => {
+  const { from, to } = getRouteEnds(props.route)
+  return `${from} → ${to}`
+})
+
+// 「接下來」那一行的一句話摘要
+function summarizeAction(action) {
+  const { leg } = action
   return {
-    board: `在${l.from}搭${l.lineName}`,
-    transfer: `在${l.from}轉${l.lineName}，往${l.dir}`,
-    ride: `坐 ${l.count} 站，在${l.to}下車`,
-    arrive: `抵達${l.to}`,
-  }[a.type]
+    board: `在${leg.from}搭${leg.lineName}`,
+    transfer: `在${leg.from}轉${leg.lineName}，往${leg.direction}`,
+    ride: `坐 ${leg.stopCount} 站，在${leg.to}下車`,
+    arrive: `抵達${leg.to}`,
+  }[action.type]
 }
 
-function next() {
-  if (isLast.value) emit('exit')
-  else step.value++
+function goToNextStep() {
+  if (isLastStep.value) emit('exit')
+  else stepIndex.value++
 }
-function prev() {
-  if (step.value > 0) step.value--
+function goToPreviousStep() {
+  if (stepIndex.value > 0) stepIndex.value--
 }
 
 // 導航中盡量讓螢幕不要自動熄滅（瀏覽器不支援就算了）
 let wakeLock = null
-async function keepAwake() {
+async function requestWakeLock() {
   try {
     wakeLock = await navigator.wakeLock?.request('screen')
   } catch {
     wakeLock = null
   }
 }
-function onVisibility() {
-  if (document.visibilityState === 'visible') keepAwake()
+function releaseWakeLock() {
+  wakeLock?.release?.()
+}
+// 切到背景時瀏覽器會自動釋放，回到前景要重新要一次
+function onVisibilityChange() {
+  if (document.visibilityState === 'visible') requestWakeLock()
 }
 onMounted(() => {
-  keepAwake()
-  document.addEventListener('visibilitychange', onVisibility)
+  requestWakeLock()
+  document.addEventListener('visibilitychange', onVisibilityChange)
 })
 onUnmounted(() => {
-  wakeLock?.release?.()
-  document.removeEventListener('visibilitychange', onVisibility)
+  releaseWakeLock()
+  document.removeEventListener('visibilitychange', onVisibilityChange)
 })
 </script>
 
@@ -76,25 +81,29 @@ onUnmounted(() => {
 
     <div class="progress" aria-hidden="true">
       <span
-        v-for="(a, i) in actions"
+        v-for="(action, i) in actions"
         :key="i"
-        :class="{ done: i < step, now: i === step }"
-        :style="{ '--seg': a.type === 'arrive' ? 'var(--ink)' : a.leg.color }"
+        :class="{ done: i < stepIndex, now: i === stepIndex }"
+        :style="{ '--seg': action.type === 'arrive' ? 'var(--ink)' : action.leg.color }"
       ></span>
     </div>
 
-    <StepCard :key="step" :action="current" :index="step" :route="route" />
+    <StepCard :key="stepIndex" :action="currentAction" :step-index="stepIndex" :route="route" />
 
     <div class="upnext">
       <template v-if="nextAction">
         <span class="k">接下來</span>
-        <span>{{ brief(nextAction) }}</span>
+        <span>{{ summarizeAction(nextAction) }}</span>
       </template>
     </div>
 
     <div class="controls">
-      <button class="secondary" type="button" :disabled="step === 0" @click="prev">上一步</button>
-      <button class="primary" type="button" @click="next">{{ BUTTON_TEXT[current.type] }}</button>
+      <button class="secondary" type="button" :disabled="stepIndex === 0" @click="goToPreviousStep">
+        上一步
+      </button>
+      <button class="primary" type="button" @click="goToNextStep">
+        {{ PRIMARY_BUTTON_TEXT[currentAction.type] }}
+      </button>
     </div>
   </section>
 </template>

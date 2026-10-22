@@ -3,78 +3,92 @@ import { ref, shallowRef, computed, watch } from 'vue'
 import StationInput from './components/StationInput.vue'
 import RoutePreview from './components/RoutePreview.vue'
 import NavigationView from './components/NavigationView.vue'
-import { resolve } from './utils/station'
-import { findRoute, toActions, routeEnds, TRANSFER_IN_STOPS } from './utils/route'
+import { resolveStationName } from './utils/station'
+import { findRoute, buildActions, getRouteEnds, TRANSFER_COST_IN_STOPS } from './utils/route'
 import { store } from './utils/storage'
 
+const SESSION_STORAGE_KEY = 'mrt-nav'
+const RECENT_STORAGE_KEY = 'mrt-recent'
+const MAX_RECENT_ROUTES = 4
+const DEFAULT_FROM = '龍山寺'
+const DEFAULT_TO = '劍南路'
+
 // ---------- 狀態 ----------
-const saved = store.get('mrt-nav') || {}
-const fromText = ref(saved.from || '龍山寺')
-const toText = ref(saved.to || '劍南路')
-const recent = ref(store.get('mrt-recent') || [])
-const navRoute = shallowRef(null) // 有值 = 正在導航
-const step = ref(0)
+const savedSession = store.get(SESSION_STORAGE_KEY) || {}
+const fromText = ref(savedSession.from || DEFAULT_FROM)
+const toText = ref(savedSession.to || DEFAULT_TO)
+const recentRoutes = ref(store.get(RECENT_STORAGE_KEY) || [])
+const activeRoute = shallowRef(null) // 有值 = 正在導航
+const stepIndex = ref(0)
 
 // ---------- 衍生資料：輸入一變，路線自動重算 ----------
-const from = computed(() => resolve(fromText.value))
-const to = computed(() => resolve(toText.value))
+const fromStation = computed(() => resolveStationName(fromText.value))
+const toStation = computed(() => resolveStationName(toText.value))
 
-const plan = computed(() => {
-  if (!from.value || !to.value) return { status: 'incomplete', route: null }
-  if (from.value === to.value) return { status: 'same', route: null }
-  const route = findRoute(from.value, to.value)
+const routePlan = computed(() => {
+  if (!fromStation.value || !toStation.value) return { status: 'incomplete', route: null }
+  if (fromStation.value === toStation.value) return { status: 'same', route: null }
+  const route = findRoute(fromStation.value, toStation.value)
   return { status: route ? 'ok' : 'none', route }
 })
 
 // ---------- 動作 ----------
-function swap() {
+function swapStations() {
   ;[fromText.value, toText.value] = [toText.value, fromText.value]
 }
 
+function applyRecentRoute(from, to) {
+  fromText.value = from
+  toText.value = to
+}
+
 // 上次存的步數來自 localStorage，不是整數就從頭開始，超出範圍就夾到頭尾
-function validStep(value, lastStep) {
+function clampStepIndex(value, lastIndex) {
   if (!Number.isInteger(value)) return 0
-  return Math.min(Math.max(value, 0), lastStep)
+  return Math.min(Math.max(value, 0), lastIndex)
 }
 
-function startNav(startStep = 0) {
-  const route = plan.value.route
+function enterNavigation(initialStep) {
+  const route = routePlan.value.route
   if (!route) return
-  navRoute.value = route
-  step.value = validStep(startStep, toActions(route.legs).length - 1)
+  const lastIndex = buildActions(route.legs).length - 1
+  activeRoute.value = route
+  stepIndex.value = clampStepIndex(initialStep, lastIndex)
   window.scrollTo(0, 0)
 }
 
-function onStart() {
-  const route = plan.value.route
+// 同一組起訖站移到最前面，不重複，最多留 MAX_RECENT_ROUTES 筆
+// 存進 localStorage 的格式是 [[起點, 終點], …]，改了會讀不到舊資料
+function saveRecentRoute({ from, to }) {
+  const others = recentRoutes.value.filter(([f, t]) => !(f === from && t === to))
+  recentRoutes.value = [[from, to], ...others].slice(0, MAX_RECENT_ROUTES)
+  store.set(RECENT_STORAGE_KEY, recentRoutes.value)
+}
+
+function startNavigation() {
+  const route = routePlan.value.route
   if (!route) return
-  const { from: f, to: t } = routeEnds(route)
-  recent.value = [[f, t], ...recent.value.filter(([a, b]) => !(a === f && b === t))].slice(0, 4)
-  store.set('mrt-recent', recent.value)
-  startNav(0)
+  saveRecentRoute(getRouteEnds(route))
+  enterNavigation(0)
 }
 
-function endNav() {
-  navRoute.value = null
+function stopNavigation() {
+  activeRoute.value = null
   window.scrollTo(0, 0)
-}
-
-function useRecent(f, t) {
-  fromText.value = f
-  toText.value = t
 }
 
 // ---------- 記住上次的查詢與導航進度 ----------
-watch([fromText, toText, navRoute, step], () => {
-  store.set('mrt-nav', {
+// 欄位名稱是存進 localStorage 的格式，改了會讀不到舊資料
+watch([fromText, toText, activeRoute, stepIndex], () => {
+  store.set(SESSION_STORAGE_KEY, {
     from: fromText.value,
     to: toText.value,
-    navigating: !!navRoute.value,
-    step: step.value,
+    navigating: !!activeRoute.value,
+    step: stepIndex.value,
   })
 })
 
-if (saved.navigating) startNav(saved.step)
+if (savedSession.navigating) enterNavigation(savedSession.step)
 </script>
 
 <template>
@@ -87,7 +101,12 @@ if (saved.navigating) startNav(saved.step)
       </div>
     </header>
 
-    <NavigationView v-if="navRoute" v-model:step="step" :route="navRoute" @exit="endNav" />
+    <NavigationView
+      v-if="activeRoute"
+      v-model:step-index="stepIndex"
+      :route="activeRoute"
+      @exit="stopNavigation"
+    />
 
     <section v-else class="screen" aria-label="查詢路線">
       <div class="od">
@@ -99,29 +118,36 @@ if (saved.navigating) startNav(saved.step)
           placeholder="站名或代碼，例如 西門、BL11"
         />
         <StationInput id="to" v-model="toText" label="終點" variant="to" placeholder="要去哪一站？" />
-        <button class="swap" type="button" aria-label="交換起點與終點" @click="swap">
+        <button class="swap" type="button" aria-label="交換起點與終點" @click="swapStations">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M7 4v16M3 8l4-4 4 4M17 20V4M13 16l4 4 4-4" />
           </svg>
         </button>
       </div>
 
-      <RoutePreview :status="plan.status" :route="plan.route" />
+      <RoutePreview :status="routePlan.status" :route="routePlan.route" />
 
-      <button class="primary" type="button" :disabled="!plan.route" @click="onStart">開始導航</button>
+      <button class="primary" type="button" :disabled="!routePlan.route" @click="startNavigation">
+        開始導航
+      </button>
 
-      <div v-if="recent.length" class="recent">
+      <div v-if="recentRoutes.length" class="recent">
         <h2>最近查過</h2>
         <div class="chips">
-          <button v-for="[f, t] in recent" :key="f + t" type="button" @click="useRecent(f, t)">
-            {{ f }} → {{ t }}
+          <button
+            v-for="[from, to] in recentRoutes"
+            :key="from + to"
+            type="button"
+            @click="applyRecentRoute(from, to)"
+          >
+            {{ from }} → {{ to }}
           </button>
         </div>
       </div>
 
       <p class="note">
         收錄台北捷運文湖、淡水信義、松山新店、中和新蘆、板南、環狀 6 條路線及新北投、小碧潭支線，不含機場捷運與輕軌。
-        路線以「轉乘一次約等於多坐 {{ TRANSFER_IN_STOPS }} 站」估算，現場請以站內指標為準。
+        路線以「轉乘一次約等於多坐 {{ TRANSFER_COST_IN_STOPS }} 站」估算，現場請以站內指標為準。
       </p>
     </section>
   </div>

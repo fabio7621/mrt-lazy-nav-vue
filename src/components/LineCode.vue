@@ -8,14 +8,14 @@ const props = defineProps({
   line: { type: String, required: true },
 })
 
-const style = computed(() => ({
+const badgeStyle = computed(() => ({
   '--lc': LINES[props.line].color,
-  '--lci': LINES[props.line].ink,
+  '--lci': LINES[props.line].textColor,
 }))
 </script>
 
 <template>
-  <span class="code" :style="style">{{ code }}</span>
+  <span class="code" :style="badgeStyle">{{ code }}</span>
 </template>
 
 <style scoped>

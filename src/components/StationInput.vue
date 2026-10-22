@@ -2,7 +2,7 @@
 // 站名輸入框 + 自動完成下拉選單
 // 用法：<StationInput id="from" v-model="fromText" label="起點" />
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { search, resolve } from '../utils/station'
+import { searchStations, resolveStationName } from '../utils/station'
 import LineCode from './LineCode.vue'
 
 const props = defineProps({
@@ -13,68 +13,81 @@ const props = defineProps({
 })
 
 // Vue 3.4+：defineModel 直接拿到 v-model 綁定的值
-const model = defineModel({ type: String, default: '' })
+const inputText = defineModel({ type: String, default: '' })
 
 const inputEl = ref(null)
 const listEl = ref(null)
-const open = ref(false)
-const active = ref(0)
-let holding = false // 手指／滑鼠正按在選單上（不需要畫面更新，用一般變數就好）
+const isListOpen = ref(false)
+const activeIndex = ref(0)
+let isPointerOnList = false // 手指／滑鼠正按在選單上（不需要畫面更新，用一般變數就好）
 
-const items = computed(() => search(model.value))
-const showList = computed(() => open.value && items.value.length > 0)
+const suggestions = computed(() => searchStations(inputText.value))
+const isListVisible = computed(() => isListOpen.value && suggestions.value.length > 0)
 const listId = computed(() => `${props.id}-list`)
+const optionId = (index) => `${props.id}-opt-${index}`
 
-function onInput() {
-  active.value = 0
-  open.value = true
+function openList() {
+  activeIndex.value = 0
+  isListOpen.value = true
 }
 
-function pick(name) {
-  holding = false
-  model.value = name
-  open.value = false
+function closeList() {
+  isListOpen.value = false
+}
+
+function selectStation(name) {
+  isPointerOnList = false
+  inputText.value = name
+  closeList()
 }
 
 // 離開輸入框：關選單，把「西門站」「bl11」整理成正式站名
-function commit() {
-  open.value = false
-  const name = resolve(model.value)
-  if (name) model.value = name
+function commitInput() {
+  closeList()
+  const name = resolveStationName(inputText.value)
+  if (name) inputText.value = name
 }
 
 // 重點：blur 會比 click 早發生，正在點選單時先不要關
 function onBlur() {
-  if (holding) return
-  commit()
+  if (isPointerOnList) return
+  commitInput()
 }
 
-function onKeydown(e) {
-  if (!showList.value || e.isComposing) return // 注音選字中按 Enter 不要搶
-  if (e.key === 'ArrowDown') {
-    active.value = Math.min(active.value + 1, items.value.length - 1)
-    e.preventDefault()
-  } else if (e.key === 'ArrowUp') {
-    active.value = Math.max(active.value - 1, 0)
-    e.preventDefault()
-  } else if (e.key === 'Enter') {
-    const it = items.value[active.value]
-    if (it) pick(it.name)
-    e.preventDefault()
-  } else if (e.key === 'Escape') {
-    open.value = false
+function moveActiveIndex(offset) {
+  const lastIndex = suggestions.value.length - 1
+  activeIndex.value = Math.min(Math.max(activeIndex.value + offset, 0), lastIndex)
+}
+
+function selectActiveSuggestion() {
+  const suggestion = suggestions.value[activeIndex.value]
+  if (suggestion) selectStation(suggestion.name)
+}
+
+function onKeydown(event) {
+  if (!isListVisible.value || event.isComposing) return // 注音選字中按 Enter 不要搶
+  if (event.key === 'ArrowDown') {
+    moveActiveIndex(1)
+    event.preventDefault()
+  } else if (event.key === 'ArrowUp') {
+    moveActiveIndex(-1)
+    event.preventDefault()
+  } else if (event.key === 'Enter') {
+    selectActiveSuggestion()
+    event.preventDefault()
+  } else if (event.key === 'Escape') {
+    closeList()
   }
 }
 
 // 保險：手指在選單上滑動但沒點選，之後點別處時要收尾
-function onDocPointerDown(e) {
-  if (holding && !listEl.value?.contains(e.target)) {
-    holding = false
-    if (document.activeElement !== inputEl.value) commit()
-  }
+function onDocumentPointerDown(event) {
+  if (!isPointerOnList || listEl.value?.contains(event.target)) return
+  isPointerOnList = false
+  if (document.activeElement !== inputEl.value) commitInput()
 }
-onMounted(() => document.addEventListener('pointerdown', onDocPointerDown))
-onUnmounted(() => document.removeEventListener('pointerdown', onDocPointerDown))
+onMounted(() => document.addEventListener('pointerdown', onDocumentPointerDown))
+onUnmounted(() => document.removeEventListener('pointerdown', onDocumentPointerDown))
 </script>
 
 <template>
@@ -84,38 +97,43 @@ onUnmounted(() => document.removeEventListener('pointerdown', onDocPointerDown))
     <input
       :id="id"
       ref="inputEl"
-      v-model="model"
+      v-model="inputText"
       autocomplete="off"
       role="combobox"
-      :aria-expanded="showList"
+      :aria-expanded="isListVisible"
       :aria-controls="listId"
-      :aria-activedescendant="showList ? `${id}-opt-${active}` : undefined"
+      :aria-activedescendant="isListVisible ? optionId(activeIndex) : undefined"
       :placeholder="placeholder"
       @focus="$event.target.select()"
-      @input="onInput"
+      @input="openList"
       @keydown="onKeydown"
       @blur="onBlur"
     />
     <ul
-      v-show="showList"
+      v-show="isListVisible"
       :id="listId"
       ref="listEl"
       class="suggest"
       role="listbox"
       @mousedown.prevent
-      @pointerdown="holding = true"
+      @pointerdown="isPointerOnList = true"
     >
       <li
-        v-for="(st, i) in items"
-        :id="`${id}-opt-${i}`"
-        :key="st.name"
+        v-for="(station, i) in suggestions"
+        :id="optionId(i)"
+        :key="station.name"
         role="option"
-        :aria-selected="i === active"
+        :aria-selected="i === activeIndex"
       >
-        <button type="button" tabindex="-1" @click="pick(st.name)">
-          <span>{{ st.name }}</span>
+        <button type="button" tabindex="-1" @click="selectStation(station.name)">
+          <span>{{ station.name }}</span>
           <span class="badges">
-            <LineCode v-for="c in st.codes" :key="c.code" :code="c.code" :line="c.line" />
+            <LineCode
+              v-for="entry in station.codes"
+              :key="entry.code"
+              :code="entry.code"
+              :line="entry.line"
+            />
           </span>
         </button>
       </li>
