@@ -3,6 +3,7 @@ import { ref, shallowRef, computed, watch } from 'vue'
 import StationInput from './components/StationInput.vue'
 import RoutePreview from './components/RoutePreview.vue'
 import NavigationView from './components/NavigationView.vue'
+import NearbyStations from './components/NearbyStations.vue'
 import { resolveStationName } from './utils/station'
 import { findRoute, buildActions, getRouteEnds, TRANSFER_COST_IN_STOPS } from './utils/route'
 import { store } from './utils/storage'
@@ -135,6 +136,8 @@ if (savedSession.navigating) enterNavigation(savedSession.step)
           </svg>
         </button>
       </div>
+
+      <NearbyStations :selected="fromStation" @select="fromText = $event" />
 
       <RoutePreview :status="routePlan.status" :route="routePlan.route" />
 
