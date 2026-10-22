@@ -64,6 +64,21 @@ describe('路線摘要', () => {
     expect(legTexts(wrapper)).toEqual(['中和新蘆線 古亭 → 民權西路 往 迴龍／蘆洲 方向 · 坐 6 站'])
   })
 
+  it('共用路段往反方向時，方向只列一個終點', async () => {
+    const wrapper = mountApp()
+    await setRoute(wrapper, '民權西路', '古亭')
+    expect(legTexts(wrapper)).toEqual(['中和新蘆線 民權西路 → 古亭 往 南勢角 方向 · 坐 6 站'])
+  })
+
+  it('同一條線的兩個分支之間，在分岔站換車', async () => {
+    const wrapper = mountApp()
+    await setRoute(wrapper, '迴龍', '蘆洲')
+    expect(legTexts(wrapper)).toEqual([
+      '中和新蘆線 迴龍 → 大橋頭 往 南勢角 方向 · 坐 9 站',
+      '中和新蘆線 大橋頭 → 蘆洲 往 蘆洲 方向 · 坐 5 站',
+    ])
+  })
+
   it('支線顯示支線名稱', async () => {
     const wrapper = mountApp()
     await setRoute(wrapper, '新北投', '北投')
@@ -78,6 +93,37 @@ describe('路線摘要', () => {
       '淡水信義線 淡水 → 大安 往 象山 方向 · 坐 23 站',
       '文湖線 大安 → 動物園 往 動物園 方向 · 坐 8 站',
     ])
+  })
+
+  // 站數、轉乘次數都一樣時選哪條，由找路的順序決定（見 route.js 的說明）
+  // 這幾組各自攔一種順序被改動的情況，結果變了就要確認是不是刻意的
+  describe('成本完全一樣時，固定選同一條路線', () => {
+    it('北門 → 台北車站：先坐松山新店線到西門', async () => {
+      const wrapper = mountApp()
+      await setRoute(wrapper, '北門', '台北車站')
+      expect(legTexts(wrapper)).toEqual([
+        '松山新店線 北門 → 西門 往 新店 方向 · 坐 1 站',
+        '板南線 西門 → 台北車站 往 南港展覽館 方向 · 坐 1 站',
+      ])
+    })
+
+    it('台北車站 → 北門：先坐淡水信義線到中山', async () => {
+      const wrapper = mountApp()
+      await setRoute(wrapper, '台北車站', '北門')
+      expect(legTexts(wrapper)).toEqual([
+        '淡水信義線 台北車站 → 中山 往 淡水 方向 · 坐 1 站',
+        '松山新店線 中山 → 北門 往 新店 方向 · 坐 1 站',
+      ])
+    })
+
+    it('東門 → 北門：先坐中和新蘆線到松江南京', async () => {
+      const wrapper = mountApp()
+      await setRoute(wrapper, '東門', '北門')
+      expect(legTexts(wrapper)).toEqual([
+        '中和新蘆線 東門 → 松江南京 往 迴龍／蘆洲 方向 · 坐 2 站',
+        '松山新店線 松江南京 → 北門 往 新店 方向 · 坐 2 站',
+      ])
+    })
   })
 
   it('需要多次轉乘時，每一段都列出來', async () => {
@@ -353,6 +399,23 @@ describe('自動完成下拉選單', () => {
       const wrapper = await slideBackToInput()
       expect(isListOpen(wrapper, 'from')).toBe(true)
     })
+  })
+
+  it('用手指點選過一次後，下次離開輸入框照常整理站名', async () => {
+    const wrapper = mountApp()
+    await typeInto(wrapper, 'from', '大安')
+    await wrapper.get('#from-list').trigger('pointerdown')
+    await wrapper.get('#from').trigger('blur')
+    await wrapper.findAll('#from-list button')[1].trigger('click')
+    await typeInto(wrapper, 'from', 'bl11')
+    await wrapper.get('#from').trigger('blur')
+    expect(inputValue(wrapper, 'from')).toBe('西門')
+  })
+
+  it('在終點打字不會打開起點的選單', async () => {
+    const wrapper = mountApp()
+    await typeInto(wrapper, 'to', '大安')
+    expect(isListOpen(wrapper, 'from')).toBe(false)
   })
 
   it('沒按住選單時點別處，不會動到站名', async () => {

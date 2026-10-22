@@ -193,3 +193,11 @@ describe('存的資料格式不對時照常使用', () => {
     expect(recentChips(mountApp())).toEqual(['西門 → 台北車站'])
   })
 })
+
+// 存檔格式是和使用者瀏覽器之間的約定，改了會讀不到舊資料
+describe('讀得懂已存的資料格式', () => {
+  it('最近查過存成 [起點, 終點] 的陣列', () => {
+    localStorage.setItem('mrt-recent', JSON.stringify([['古亭', '民權西路'], ['西門', '台北車站']]))
+    expect(recentChips(mountApp())).toEqual(['古亭 → 民權西路', '西門 → 台北車站'])
+  })
+})

@@ -230,6 +230,16 @@ describe('第 3 步：轉乘', () => {
     )
   })
 
+  it('同一條線換分支時，也算一次轉乘', async () => {
+    const wrapper = await navigateTo('迴龍', '蘆洲', 2)
+    expect(cardPart(wrapper, '.big')).toBe('轉 中和新蘆線')
+  })
+
+  it('同一條線換分支時，代碼是分岔站的代碼', async () => {
+    const wrapper = await navigateTo('迴龍', '蘆洲', 2)
+    expect(cardPart(wrapper, '.where .code')).toBe('O12')
+  })
+
   it('主按鈕是「我上車了」', async () => {
     const wrapper = await navigateTo('龍山寺', '劍南路', 2)
     expect(primaryLabel(wrapper)).toBe('我上車了')
