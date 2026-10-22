@@ -13,11 +13,22 @@ const MAX_RECENT_ROUTES = 4
 const DEFAULT_FROM = '龍山寺'
 const DEFAULT_TO = '劍南路'
 
+// ---------- 讀取上次存的資料 ----------
+// localStorage 的內容不可信（舊版本、手動改過），型別不對就當沒存過
+const isNonEmptyText = (value) => typeof value === 'string' && value !== ''
+const isRecentRoute = (entry) =>
+  Array.isArray(entry) && entry.length === 2 && entry.every(isNonEmptyText)
+
+function loadRecentRoutes() {
+  const saved = store.get(RECENT_STORAGE_KEY)
+  return Array.isArray(saved) ? saved.filter(isRecentRoute) : []
+}
+
 // ---------- 狀態 ----------
 const savedSession = store.get(SESSION_STORAGE_KEY) || {}
-const fromText = ref(savedSession.from || DEFAULT_FROM)
-const toText = ref(savedSession.to || DEFAULT_TO)
-const recentRoutes = ref(store.get(RECENT_STORAGE_KEY) || [])
+const fromText = ref(isNonEmptyText(savedSession.from) ? savedSession.from : DEFAULT_FROM)
+const toText = ref(isNonEmptyText(savedSession.to) ? savedSession.to : DEFAULT_TO)
+const recentRoutes = ref(loadRecentRoutes())
 const activeRoute = shallowRef(null) // 有值 = 正在導航
 const stepIndex = ref(0)
 

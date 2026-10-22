@@ -161,3 +161,35 @@ describe('瀏覽器不讓存資料時照常使用', () => {
     expect(previewText(wrapper)).toContain('10站')
   })
 })
+
+// JSON 解析得了，但欄位型別不對（舊版本、手動改過、其他程式寫入）
+describe('存的資料格式不對時照常使用', () => {
+  it('起點不是文字時用預設起點', () => {
+    savedSession({ from: 123, to: '台北車站' })
+    expect(inputValue(mountApp(), 'from')).toBe('龍山寺')
+  })
+
+  it('終點不是文字時用預設終點', () => {
+    savedSession({ from: '西門', to: ['台北車站'] })
+    expect(inputValue(mountApp(), 'to')).toBe('劍南路')
+  })
+
+  it('最近查過不是陣列時，不顯示最近查過', () => {
+    localStorage.setItem('mrt-recent', JSON.stringify({}))
+    expect(recentChips(mountApp())).toEqual([])
+  })
+
+  it('最近查過不是陣列時，照樣能開始導航並記下這條路線', async () => {
+    localStorage.setItem('mrt-recent', JSON.stringify({}))
+    const wrapper = mountApp()
+    await startNavigation(wrapper, '西門', '台北車站')
+    await clickButton(wrapper, '← 結束導航')
+    expect(recentChips(wrapper)).toEqual(['西門 → 台北車站'])
+  })
+
+  it('最近查過裡格式不對的項目略過，其他照常顯示', () => {
+    const recent = [null, ['西門'], [1, 2], '古亭', ['西門', '台北車站']]
+    localStorage.setItem('mrt-recent', JSON.stringify(recent))
+    expect(recentChips(mountApp())).toEqual(['西門 → 台北車站'])
+  })
+})
