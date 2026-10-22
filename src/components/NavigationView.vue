@@ -48,9 +48,13 @@ function goToPreviousStep() {
 
 // 導航中盡量讓螢幕不要自動熄滅（瀏覽器不支援就算了）
 let wakeLock = null
+let isUnmounted = false
 async function requestWakeLock() {
   try {
-    wakeLock = await navigator.wakeLock?.request('screen')
+    const lock = await navigator.wakeLock?.request('screen')
+    // 瀏覽器答應前導航可能已經結束，這時拿到的鎖要馬上放掉
+    if (isUnmounted) lock?.release?.()
+    else wakeLock = lock
   } catch {
     wakeLock = null
   }
@@ -67,6 +71,7 @@ onMounted(() => {
   document.addEventListener('visibilitychange', onVisibilityChange)
 })
 onUnmounted(() => {
+  isUnmounted = true
   releaseWakeLock()
   document.removeEventListener('visibilitychange', onVisibilityChange)
 })

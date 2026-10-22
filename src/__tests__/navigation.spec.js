@@ -355,6 +355,17 @@ describe('導航中保持螢幕常亮', () => {
     expect(lock.release).toHaveBeenCalledOnce()
   })
 
+  it('瀏覽器還沒答應就結束導航，答應後立刻放掉常亮', async () => {
+    const lock = { release: vi.fn() }
+    let grant
+    installWakeLock(vi.fn(() => new Promise((resolve) => (grant = resolve))))
+    const wrapper = await navigateTo('龍山寺', '劍南路')
+    await clickButton(wrapper, '← 結束導航')
+    grant(lock)
+    await flushPromises()
+    expect(lock.release).toHaveBeenCalledOnce()
+  })
+
   it('切回這個分頁時重新要求常亮', async () => {
     const request = vi.fn().mockResolvedValue({ release: vi.fn() })
     installWakeLock(request)
