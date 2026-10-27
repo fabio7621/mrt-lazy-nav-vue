@@ -160,7 +160,7 @@ if (savedSession.navigating) enterNavigation(savedSession.step)
       </div>
 
       <p class="note">
-        收錄台北捷運文湖、淡水信義、松山新店、中和新蘆、板南、環狀 6 條路線及新北投、小碧潭支線，不含機場捷運與輕軌。
+        收錄台北捷運文湖、淡水信義、松山新店、中和新蘆、板南、環狀 6 條路線及新北投、小碧潭支線，以及新北捷運安坑輕軌、三鶯線；不含機場捷運與淡海輕軌。
         路線以「轉乘一次約等於多坐 {{ TRANSFER_COST_IN_STOPS }} 站」估算，現場請以站內指標為準。
       </p>
     </section>

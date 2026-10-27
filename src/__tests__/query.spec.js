@@ -137,6 +137,24 @@ describe('路線摘要', () => {
     ])
   })
 
+  it('安坑輕軌的站可以查，在十四張轉環狀線', async () => {
+    const wrapper = mountApp()
+    await setRoute(wrapper, '新和國小', '大坪林')
+    expect(legTexts(wrapper)).toEqual([
+      '安坑輕軌 新和國小 → 十四張 往 十四張 方向 · 坐 1 站',
+      '環狀線 十四張 → 大坪林 往 大坪林 方向 · 坐 1 站',
+    ])
+  })
+
+  it('三鶯線的站可以查，在頂埔轉板南線', async () => {
+    const wrapper = mountApp()
+    await setRoute(wrapper, '鶯歌車站', '板橋')
+    expect(legTexts(wrapper)).toEqual([
+      '三鶯線 鶯歌車站 → 頂埔 往 頂埔 方向 · 坐 7 站',
+      '板南線 頂埔 → 板橋 往 南港展覽館 方向 · 坐 6 站',
+    ])
+  })
+
   it('轉乘次數照實計算', async () => {
     const wrapper = mountApp()
     await setRoute(wrapper, '新北投', '小碧潭')
@@ -170,6 +188,11 @@ describe('頁尾說明', () => {
     // 找路成本：坐一站 2、轉乘一次 7 → 轉乘一次約等於多坐 3.5 站
     const wrapper = mountApp()
     expect(wrapper.get('.note').text()).toContain('路線以「轉乘一次約等於多坐 3.5 站」估算')
+  })
+
+  it('列出收錄的新北捷運路線', () => {
+    const wrapper = mountApp()
+    expect(wrapper.get('.note').text()).toContain('新北捷運安坑輕軌、三鶯線')
   })
 })
 
@@ -304,7 +327,7 @@ describe('自動完成下拉選單', () => {
   it('只打一個「站」字時，列出站名有「站」的站', async () => {
     const wrapper = mountApp()
     await typeInto(wrapper, 'from', '站')
-    expect(optionNames(wrapper, 'from')).toEqual(['台北車站'])
+    expect(optionNames(wrapper, 'from')).toEqual(['台北車站', '鶯歌車站'])
   })
 
   it('可以用車站代碼開頭搜尋', async () => {

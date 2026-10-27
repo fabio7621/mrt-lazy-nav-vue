@@ -1,4 +1,4 @@
-// 台北捷運路網資料
+// 台北捷運路網資料（另收錄和台北捷運相接的新北捷運安坑輕軌、三鶯線）
 // LINES：每條路線的名稱與顏色（color 是路線底色，textColor 是疊在底色上的字色，colorName 給提示文字用）
 // SERVICES：實際會開的「列車種類」，車站依行駛順序排列
 //   有分支的路線（中和新蘆線、支線）拆成多個 service，演算法才知道哪裡要換車
@@ -10,6 +10,8 @@ export const LINES = {
   O: { name: '中和新蘆線', color: '#f8b61c', textColor: '#1b1404', colorName: '橘' },
   BL: { name: '板南線', color: '#0070bd', textColor: '#ffffff', colorName: '藍' },
   Y: { name: '環狀線', color: '#ffdb00', textColor: '#1b1704', colorName: '黃' },
+  K: { name: '安坑輕軌', color: '#c3b091', textColor: '#1f1a10', colorName: '卡其' },
+  LB: { name: '三鶯線', color: '#79bce8', textColor: '#0b1a24', colorName: '天藍' },
 }
 
 // 中和新蘆線兩條分支共用的主線段（南勢角 → 大橋頭）
@@ -26,6 +28,10 @@ const RAW_SERVICES = [
   { id: 'BL', line: 'BL', seq: 'BL01頂埔 BL02永寧 BL03土城 BL04海山 BL05亞東醫院 BL06府中 BL07板橋 BL08新埔 BL09江子翠 BL10龍山寺 BL11西門 BL12台北車站 BL13善導寺 BL14忠孝新生 BL15忠孝復興 BL16忠孝敦化 BL17國父紀念館 BL18市政府 BL19永春 BL20後山埤 BL21昆陽 BL22南港 BL23南港展覽館' },
   { id: 'BR', line: 'BR', seq: 'BR01動物園 BR02木柵 BR03萬芳社區 BR04萬芳醫院 BR05辛亥 BR06麟光 BR07六張犁 BR08科技大樓 BR09大安 BR10忠孝復興 BR11南京復興 BR12中山國中 BR13松山機場 BR14大直 BR15劍南路 BR16西湖 BR17港墘 BR18文德 BR19內湖 BR20大湖公園 BR21葫洲 BR22東湖 BR23南港軟體園區 BR24南港展覽館' },
   { id: 'Y', line: 'Y', seq: 'Y07大坪林 Y08十四張 Y09秀朗橋 Y10景平 Y11景安 Y12中和 Y13橋和 Y14中原 Y15板新 Y16板橋 Y17新埔民生 Y18頭前庄 Y19幸福 Y20新北產業園區' },
+  // 新北捷運：排在最後，才不會改到原本路線之間同成本時的選路結果（見 route.js）
+  { id: 'K', line: 'K', seq: 'K01雙城 K02玫瑰中國城 K03台北小城 K04耕莘安康院區 K05景文科大 K06安康 K07陽光運動公園 K08新和國小 K09十四張' },
+  // 正式站名是「臺北大學」，這裡統一寫「台」，和台北車站等站一致
+  { id: 'LB', line: 'LB', seq: 'LB01頂埔 LB02媽祖田 LB03長壽山 LB04橫溪 LB05龍埔 LB06三峽 LB07台北大學 LB08鶯歌車站 LB09陶瓷老街 LB10國華 LB11永吉公園 LB12鶯桃福德' },
 ]
 
 // 'BL11西門' → { code: 'BL11', name: '西門' }
